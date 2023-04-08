@@ -425,12 +425,6 @@ export default class Stage {
     Matter.Runner.run(this.runner, this.engine)
     const { append } = csvAppend('steps.csv')
     Matter.Events.on(this.engine, 'afterUpdate', () => {
-      const allIts = this.getAllIts()
-      if (allIts.length === 0) {
-        console.warn('empty allIts:', allIts)
-        // throw new Error('No it!')
-        this.paused = true
-      }
       this.stepCount = this.stepCount + 1
       this.raycast.rayCountTotal = this.raycast.rayCountTotal + this.raycast.stepRayCount
       this.totalCollisionCount = this.totalCollisionCount + this.stepCollisionStartCount // + this.activeCollisions
@@ -498,7 +492,8 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         const spawnDifference = now - this.spawnTime
         const spawnLimit = this.getSpawnLimit()
         if (spawnDifference > spawnLimit) {
-          void new Bot({ x: 0, y: 0, stage: this })
+          const waypoint = this.getSafestWaypoint()
+          void new Bot({ x: waypoint.position.x, y: waypoint.position.y, stage: this })
           this.spawnTime = now
         }
       }
@@ -584,7 +579,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
 
   debug ({ label }: { label?: string | number }): void {
     console.debug('CLIENT DEBUG:', label)
-    console.debug(label, 'sceneryBodies length:', this.sceneryBodies.length)
+    console.debug(label, 'bots length:', this.bots.length)
   }
 
   getAllIts (): Character[] {
@@ -604,12 +599,29 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
     }
   }
 
+  getSafestWaypoint (): Waypoint {
+    const allIts = this.getAllIts()
+    const waypoints = this.waypointGroups[15]
+    const farthest = waypoints.reduce<{ waypoint?: Waypoint, distance: number }>((farthest, waypoint) => {
+      const distance = allIts.reduce((distance, it) => {
+        const d = Matter.Vector.magnitude(Matter.Vector.sub(it.feature.body.position, waypoint.position))
+        return d < distance ? d : distance
+      }, Infinity)
+      return distance > farthest.distance ? { waypoint, distance } : farthest
+    }, { distance: 0 })
+    if (farthest.waypoint == null) {
+      throw new Error('No farthest waypoint')
+    }
+    return farthest.waypoint
+  }
+
   getSpawnLimit (): number {
     return this.characters.size * 500
   }
 
   join (id: string): Player {
     const firstIt = this.getFirstIt()
+    console.log('firstIt', firstIt)
     if (firstIt == null) {
       return new Player({
         id,
@@ -681,6 +693,16 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
     })
   }
 
+  spawnSafestBrick (): void {
+    const waypoint = this.getSafestWaypoint()
+    this.randomBrick({
+      x: waypoint.position.x,
+      y: waypoint.position.y,
+      width: 30,
+      height: 30
+    })
+  }
+
   timeout (delay: number, action: () => void): void {
     const startTime = this.engine.timing.timestamp
     const endTime = startTime + delay
@@ -732,7 +754,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
       torsoId: player.feature.body.id
     }
     player.goals.forEach((goal) => {
-      const circleColor = goal.scored ? 'rgba(255, 255, 255, 0.25)' : goal.heading.tight ? 'rgba(255, 0, 0, 0.25)' : 'rgba(255, 0, 0, 0.25)'
+      const circleColor = goal.scored ? 'rgba(255, 255, 255, 0.25)' : goal.heading.tight ? 'rgba(0, 128, 0, 0.25)' : 'rgba(0, 255, 0, 0.25)'
       const radius = goal.heading.tight ? 15 : 7.5
       const circle = new Circle({
         color: circleColor,
@@ -741,7 +763,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         y: goal.heading.waypoint.position.y
       })
       message.circles = [...message.circles, circle]
-      const labelColor = goal.scored ? 'white' : 'red'
+      const labelColor = 'white'
       const text = goal.scored
         ? goal.number
         : goal.heading.tight
@@ -760,7 +782,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
       throw new Error('More than one pass')
     }
     passes.forEach(pass => {
-      const color = pass.scored ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 0, 0, 0.15)'
+      const color = pass.scored ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 255, 0, 0.15)'
       const circle = new Circle({
         color,
         radius: 10,

@@ -3,7 +3,6 @@ import Feature from './Feature'
 import Stage from './Stage'
 import Actor from './Actor'
 import { project } from './math'
-import Bot from './Bot'
 import Character from './Character'
 
 export default class PropActor extends Actor {
@@ -90,7 +89,7 @@ export default class PropActor extends Actor {
     if (this.health <= 0) {
       if (actor?.isIt() === true) {
         if (this.stage.spawnOnDestroy) {
-          void new Bot({ stage: this.stage, x: this.feature.body.position.x, y: this.feature.body.position.y })
+          this.stage.spawnSafestBrick()
         }
       } else if (actor?.feature.body.label === 'character') {
         const area = this.feature.getArea()
@@ -105,7 +104,6 @@ export default class PropActor extends Actor {
           const needed = 10 / radius
           actor.feature.setColor(PropActor.COLOR)
           Matter.Body.scale(actor.feature.body, needed, needed)
-          void new Bot({ stage: this.stage, x: this.feature.body.position.x, y: this.feature.body.position.y })
         } else {
           const character = actor as Character
           character.setRadiusColor()

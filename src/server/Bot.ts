@@ -29,9 +29,6 @@ export default class Bot extends Character {
     super({ x, y, radius, stage })
     this.stage.bots.push(this)
     if (this.stage.oldest == null) this.stage.oldest = this
-    if (!this.isIt()) {
-      this.loseReady({})
-    }
   }
 
   act (): void {
@@ -77,6 +74,10 @@ export default class Bot extends Character {
 
     if (enemy != null) {
       if (it) {
+        const point = vectorToPoint(enemy.feature.body.position)
+        this.setPath({ path: [point], label: 'pursue' })
+        return point
+      } else {
         this.blocked = this.isBlocked({ character: enemy })
         const trapped = this.blocked && this.isBored()
         if (trapped) {
@@ -85,12 +86,8 @@ export default class Bot extends Character {
         if (this.pathLabel !== 'unblock') {
           return this.flee({ character: enemy })
         }
-      } else {
-        const point = vectorToPoint(enemy.feature.body.position)
-        this.setPath({ path: [point], label: 'pursue' })
-        return point
       }
-    } else if (it) {
+    } else if (!it) {
       this.blocked = false
       this.unblockTries = undefined
     }
