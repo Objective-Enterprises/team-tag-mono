@@ -779,13 +779,12 @@ export default class Character extends Actor {
     }
     const profiles: Profile[] = []
     this.stage.characters.forEach(character => {
-      if (character.isIt() || character === oldIt || character === this) return
+      if (character === oldIt || character === this || character.isPlayer) return
       const distance = this.getDistance(character.feature.body.position)
       profiles.push({ character, distance })
     })
     profiles.sort((a, b) => a.distance - b.distance)
     const bystander = profiles.find(profile => {
-      if (profile.character === oldIt || profile.character.isPlayer || profile.character.isIt()) return false
       const isVisible = this.isFeatureVisible(profile.character.feature)
       return isVisible
     })?.character
@@ -795,32 +794,33 @@ export default class Character extends Actor {
     const radius = this.feature.getRadius()
     const needed = 15 / radius
     Matter.Body.scale(this.feature.body, needed, needed)
-    const propActor = oldIt?.loseIt({ newIt: this })
-    if (this.stage.engine.timing.timestamp > 1000) {
-      const inRangeFeatures = this.getInRangeFeatures()
-      inRangeFeatures.forEach(feature => {
-        if (
-          feature.body.id !== this.feature.body.id &&
-          feature.body.id !== propActor?.feature.body.id &&
-          !feature.body.isStatic
-        ) {
-          const distance = this.getDistance(feature.body.position)
-          const pushable = feature.body.label === 'character'
-            ? this.isFeatureVisible(feature)
-            : feature.getArea() > this.feature.getArea()
-          if (pushable) {
-            const fromPoint = this.feature.body.position
-            const pushPoint = feature.body.position
-            if (distance <= 0) throw new Error('Push point intersection')
-            const difference = Matter.Vector.sub(pushPoint, fromPoint)
-            const direction = Matter.Vector.normalise(difference)
-            const power = 2000000 / distance
-            const force = Matter.Vector.mult(direction, power)
-            Matter.Body.applyForce(feature.body, pushPoint, force)
-            Matter.Body.update(feature.body, 0.01, 1, 0)
-          }
-        }
-      })
-    }
+    oldIt?.loseIt({ newIt: this })
+    // const propActor = oldIt?.loseIt({ newIt: this })
+    // if (this.stage.engine.timing.timestamp > 1000) {
+    //   const inRangeFeatures = this.getInRangeFeatures()
+    //   inRangeFeatures.forEach(feature => {
+    //     if (
+    //       feature.body.id !== this.feature.body.id &&
+    //       feature.body.id !== propActor?.feature.body.id &&
+    //       !feature.body.isStatic
+    //     ) {
+    //       const distance = this.getDistance(feature.body.position)
+    //       const pushable = feature.body.label === 'character'
+    //         ? this.isFeatureVisible(feature)
+    //         : feature.getArea() > this.feature.getArea()
+    //       if (pushable) {
+    //         const fromPoint = this.feature.body.position
+    //         const pushPoint = feature.body.position
+    //         if (distance <= 0) throw new Error('Push point intersection')
+    //         const difference = Matter.Vector.sub(pushPoint, fromPoint)
+    //         const direction = Matter.Vector.normalise(difference)
+    //         const power = 2000000 / distance
+    //         const force = Matter.Vector.mult(direction, power)
+    //         Matter.Body.applyForce(feature.body, pushPoint, force)
+    //         Matter.Body.update(feature.body, 0.01, 1, 0)
+    //       }
+    //     }
+    //   })
+    // }
   }
 }

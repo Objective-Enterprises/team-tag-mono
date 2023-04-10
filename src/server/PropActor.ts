@@ -48,7 +48,7 @@ export default class PropActor extends Actor {
   getScale ({ label }: { label: string}): number {
     switch (label) {
       case 'wall':
-        return 0.01
+        return 0.1
       case 'character':
         return 100
       default:

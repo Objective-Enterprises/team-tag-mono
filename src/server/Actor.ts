@@ -26,9 +26,6 @@ export default class Actor {
   }): void {}
 
   destroy (): void {
-    if (this.isIt()) {
-      throw new Error('Cannot destroy the it actor')
-    }
     this.feature.destroy()
     this.stage.actors.delete(this.feature.body.id)
   }

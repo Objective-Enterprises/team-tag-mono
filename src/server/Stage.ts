@@ -492,8 +492,12 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         const spawnDifference = now - this.spawnTime
         const spawnLimit = this.getSpawnLimit()
         if (spawnDifference > spawnLimit) {
-          const waypoint = this.getSafestWaypoint()
-          void new Bot({ x: waypoint.position.x, y: waypoint.position.y, stage: this })
+          const waypoint = this.getSafestWaypoint({ its: true })
+          const allIts = this.getAllIts()
+          const halfCharacters = this.characters.size / 2
+          const safe = halfCharacters > allIts.length
+          const color = safe ? Character.IT_COLOR : Character.NOT_IT_COLOR
+          void new Bot({ x: waypoint.position.x, y: waypoint.position.y, stage: this, ...color })
           this.spawnTime = now
         }
       }
@@ -599,11 +603,13 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
     }
   }
 
-  getSafestWaypoint (): Waypoint {
-    const allIts = this.getAllIts()
+  getSafestWaypoint (props?: {
+    its?: boolean
+  }): Waypoint {
+    const characters = props?.its === true ? this.getAllIts() : [...this.characters.values()]
     const waypoints = this.waypointGroups[15]
     const farthest = waypoints.reduce<{ waypoint?: Waypoint, distance: number }>((farthest, waypoint) => {
-      const distance = allIts.reduce((distance, it) => {
+      const distance = characters.reduce((distance, it) => {
         const d = Matter.Vector.magnitude(Matter.Vector.sub(it.feature.body.position, waypoint.position))
         return d < distance ? d : distance
       }, Infinity)
@@ -763,7 +769,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         y: goal.heading.waypoint.position.y
       })
       message.circles = [...message.circles, circle]
-      const labelColor = 'white'
+      const labelColor = goal.scored ? 'white' : 'limegreen'
       const text = goal.scored
         ? goal.number
         : goal.heading.tight

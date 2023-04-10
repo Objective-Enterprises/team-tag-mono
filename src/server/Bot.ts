@@ -20,13 +20,17 @@ export default class Bot extends Character {
   pathTime?: number
   pathLabel?: typeof Bot.pathLabels[number]
   unblockTries?: Record<number, boolean>
-  constructor ({ radius = 15, stage, x = 0, y = 0 }: {
+  constructor ({ blue, green, radius = 15, red, stage, x = 0, y = 0 }: {
+    alpha?: number
+    blue?: number
+    green?: number
     radius?: number
+    red?: number
     stage: Stage
     x: number
     y: number
   }) {
-    super({ x, y, radius, stage })
+    super({ blue, green, x, y, radius, red, stage })
     this.stage.bots.push(this)
     if (this.stage.oldest == null) this.stage.oldest = this
   }
@@ -110,7 +114,7 @@ export default class Bot extends Character {
         x: exploreHeading.waypoint.position.x,
         y: exploreHeading.waypoint.position.y
       })
-      this.stage.paused = true
+      throw new Error('Exploring same position')
     }
     this.setPath({ path: [exploreHeading.waypoint.position], label: 'explore' })
     return this.path[0]
