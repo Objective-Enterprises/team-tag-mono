@@ -17,17 +17,19 @@ import Shape from '../shared/Shape'
 import { UpdateMessage } from '../shared/socket'
 import { VISION_INNER } from '../shared/VISION'
 import { getRandomRectangleSize } from './math'
-import Puppet from './Puppet'
-import { EAST_VECTOR, NORTH_VECTOR, SOUTH_VECTOR, WEST_VECTOR } from '../shared/math'
 
 export default class Stage {
   stepActiveCollisionCount = 0
   actors = new Map<number, Actor>()
   bodies: Matter.Body[] = []
   bots: Bot[] = []
+  centerBot: boolean
   characters = new Map<number, Character>()
   characterBodies: Matter.Body[] = []
   circles: Circle[] = []
+  cornerBots: boolean
+  countryBots: boolean
+  countryWalls: boolean
   stepCollisionStartCount = 0
   debugBored: boolean
   debugCharacters: boolean
@@ -50,19 +52,28 @@ export default class Stage {
   debugWaypointLabels: boolean
   engine = Matter.Engine.create()
   features = new Map<number, Feature>()
+  greekBots: boolean
+  greekWalls: boolean
+  gridBots: boolean
   initial = true
+  halfSize: number
   labels: Label[] = []
   lines: Line[] = []
   lostPoints: Matter.Vector[] = []
+  maximumArea: number
+  maximumRadius = 15
+  midpointBots: boolean
+  minimumRadius = 10
   observer: boolean
   oldest?: Bot
   oldTime = Date.now()
   paused = false
-  radii = [10, 11, 12, 13, 14, 15]
+  radii: number[] = []
   raycast: Raycast
   runner = Matter.Runner.create()
   sceneryFeatures: Feature[] = []
   sceneryBodies: Matter.Body[] = []
+  size: number
   spawnOnDestroy: boolean
   spawnOnScore: boolean
   spawnOnTag: boolean
@@ -77,21 +88,26 @@ export default class Stage {
   timers = new Map<number, [number, () => void]>()
   totalBodyCount = 0
   totalCollisionCount = 0
+  townBots: boolean
+  townWalls: boolean
   wallBodies: Matter.Body[] = []
+  wallBots: boolean
   walls: Wall[] = []
   warningCount = 0
   warningDifferenceTotal = 0
   warningTime = Date.now()
   readonly warnings10: number[] = []
+  waypointBots: boolean
+  waypointBricks: boolean
   waypointGroups: Record<number, Waypoint[]> = { }
+  wildBricks: boolean
+  wildPuppets: boolean
   xFactor = 2
-  xSegment: number
   yFactor = 2
-  ySegment: number
   constructor ({
     centerBot = true,
     cornerBots = false,
-    country = true,
+    countryWalls = true,
     countryBots = false,
     debugBored = false,
     debugCharacters = false,
@@ -112,18 +128,18 @@ export default class Stage {
     debugStepTime = true,
     debugWaypointCircles = false,
     debugWaypointLabels = false,
-    greek = true,
+    greekWalls = true,
     greekBots = false,
     gridBots = false,
     midpointBots = false,
     observer = false,
     spawnOnDestroy = true,
-    spawnOnScore = true,
+    spawnOnScore = false,
     spawnOnTag = true,
     spawnOnTimer = true,
     size = 3000,
     stepTimeLimit = 35,
-    town = true,
+    townWalls = true,
     townBots = false,
     wallBots = false,
     waypointBots = false,
@@ -133,8 +149,8 @@ export default class Stage {
   }: {
     centerBot?: boolean
     cornerBots?: boolean
-    country?: boolean
     countryBots?: boolean
+    countryWalls?: boolean
     debugBored?: boolean
     debugCharacters?: boolean
     debugChase?: boolean
@@ -154,7 +170,7 @@ export default class Stage {
     debugStepTime?: boolean
     debugWaypointCircles?: boolean
     debugWaypointLabels?: boolean
-    greek?: boolean
+    greekWalls?: boolean
     greekBots?: boolean
     gridBots?: boolean
     midpointBots?: boolean
@@ -165,7 +181,7 @@ export default class Stage {
     spawnOnTimer?: boolean
     size?: number
     stepTimeLimit?: number
-    town?: boolean
+    townWalls?: boolean
     townBots?: boolean
     wallBots?: boolean
     waypointBots?: boolean
@@ -173,7 +189,10 @@ export default class Stage {
     wildBricks?: boolean
     wildPuppets?: boolean
   }) {
-    this.spawnTime = Date.now()
+    this.centerBot = centerBot
+    this.cornerBots = cornerBots
+    this.countryBots = countryBots
+    this.countryWalls = countryWalls
     this.debugBored = debugBored
     this.debugCharacters = debugCharacters
     this.debugChase = debugChase
@@ -193,107 +212,265 @@ export default class Stage {
     this.debugExplore = debugExplore
     this.debugWaypointCircles = debugWaypointCircles
     this.debugWaypointLabels = debugWaypointLabels
+    this.greekBots = greekBots
+    this.greekWalls = greekWalls
+    this.gridBots = gridBots
+    this.midpointBots = midpointBots
     this.observer = observer
+    this.size = size
     this.spawnOnDestroy = spawnOnDestroy
     this.spawnOnScore = spawnOnScore
     this.spawnOnTag = spawnOnTag
     this.spawnOnTimer = spawnOnTimer
     this.stepTimeLimit = stepTimeLimit
+    this.townBots = townBots
+    this.townWalls = townWalls
+    this.wallBots = wallBots
+    this.waypointBots = waypointBots
+    this.waypointBricks = waypointBricks
+    this.wildBricks = wildBricks
+    this.wildPuppets = wildPuppets
+    this.spawnTime = Date.now()
     this.engine.gravity = { x: 0, y: 0, scale: 1 }
     this.raycast = new Raycast({ stage: this })
+    for (let radius = this.minimumRadius; radius <= this.maximumRadius; radius++) {
+      this.radii.push(radius)
+    }
     this.radii.forEach(radius => { this.waypointGroups[radius] = [] })
-    const wallSize = size * 3
+    const wallSize = this.size * 3
     const wallProps = [
-      { x: 0, y: size, width: wallSize, height: size },
-      { x: 0, y: -size, width: wallSize, height: size },
-      { x: size, y: 0, width: size, height: wallSize },
-      { x: -size, y: 0, width: size, height: wallSize }
+      { x: 0, y: this.size, width: wallSize, height: this.size },
+      { x: 0, y: -this.size, width: wallSize, height: this.size },
+      { x: this.size, y: 0, width: this.size, height: wallSize },
+      { x: -this.size, y: 0, width: this.size, height: wallSize }
     ]
     wallProps.forEach((props) => {
       void new Wall({ ...props, waypoints: false, stage: this })
     })
-    const halfSize = size / 2
-    const marginEdge = halfSize - Character.MARGIN
-    const townWalls: Wall[] = []
-    if (town) {
-      const PIT = new Wall({ x: 605, y: -955, width: 1700, height: 1000, stage: this })
-      const BYTE = new Wall({ x: -500, y: -1300, width: 5, height: 5, stage: this })
-      const PALACE = new Wall({ x: -1000, y: -1150, width: 600, height: 310, stage: this })
-      const BIT = new Wall({ x: -500, y: -1100, width: 1, height: 1, stage: this })
-      const FORT = new Wall({ x: -872.5, y: -900, width: 1165, height: 100, stage: this })
-      const MANSION = new Wall({ x: -520, y: -700, width: 460, height: 210, stage: this })
-      const KNIFE = new Wall({ x: -1244.75, y: -659, width: 420.5, height: 2, stage: this })
-      const SCALPEL = new Wall({ x: -1244.75, y: -612.5, width: 420.5, height: 1, stage: this })
-      const OUTPOST = new Wall({ x: -1350, y: -517, width: 175, height: 100, stage: this })
-      const ARMORY = new Wall({ x: -1125, y: -517, width: 175, height: 100, stage: this })
-      const DAGGER = new Wall({ x: -988, y: -500, width: 3, height: 610, stage: this })
-      const RAPIER = new Wall({ x: -941, y: -400, width: 1, height: 810, stage: this })
-      const PRECINCT = new Wall({ x: -845, y: -500, width: 100, height: 610, stage: this })
-      const BUTCHER = new Wall({ x: -700, y: -500, width: 100, height: 100, stage: this })
-      const BAKER = new Wall({ x: -555, y: -500, width: 100, height: 100, stage: this })
-      const CANDLESTICK = new Wall({ x: -375, y: -500, width: 170, height: 100, stage: this })
-      const BAYONET = new Wall({ x: -1244.75, y: -419.5, width: 420.5, height: 5, stage: this })
-      townWalls.push(PIT, BYTE, PALACE, BIT, FORT, MANSION, KNIFE, SCALPEL, OUTPOST, ARMORY, DAGGER, RAPIER, PRECINCT, BUTCHER, BAKER, CANDLESTICK, BAYONET)
-    }
+    this.halfSize = this.size / 2
+    this.maximumArea = this.size * this.size
+  }
 
-    const greekWalls: Wall[] = []
-    if (greek) {
-      const alpha = new Wall({ x: -1454.5, y: -755, width: 1, height: 100, stage: this })
-      const beta = new Wall({ x: -1408.5, y: -755, width: 1, height: 100, stage: this })
-      const gamma = new Wall({ x: -1363, y: -755, width: 1, height: 100, stage: this })
-      const delta = new Wall({ x: -1317.5, y: -755, width: 1, height: 100, stage: this })
-      const epsilon = new Wall({ x: -1272, y: -755, width: 1, height: 100, stage: this })
-      const zeta = new Wall({ x: -1226.5, y: -755, width: 1, height: 100, stage: this })
-      const eta = new Wall({ x: -1181, y: -755, width: 1, height: 100, stage: this })
-      const theta = new Wall({ x: -1135.5, y: -755, width: 1, height: 100, stage: this })
-      const iota = new Wall({ x: -1090, y: -755, width: 1, height: 100, stage: this })
-      const kappa = new Wall({ x: -1039.275, y: -801, width: 9.45, height: 8, stage: this })
-      const lamda = new Wall({ x: -1039.275, y: -751.5, width: 9.45, height: 1, stage: this })
-      const mu = new Wall({ x: -1039.275, y: -705.5, width: 9.45, height: 1, stage: this })
-      greekWalls.push(alpha, beta, gamma, delta, epsilon, zeta, eta, theta, iota, kappa, lamda, mu)
-      townWalls.concat(greekWalls)
-    }
+  block (): void {}
 
-    const countryWalls: Wall[] = []
-    if (country) {
-      countryWalls.push(
-        new Wall({ x: -1100, y: 400, width: 200, height: 500, stage: this }),
-        new Wall({ x: 0, y: -200, width: 100, height: 100, stage: this }),
-        new Wall({ x: 1000, y: 200, width: 200, height: 1000, stage: this }),
-        new Wall({ x: -400, y: 600, width: 1000, height: 1000, stage: this }),
-        new Wall({ x: 450, y: 700, width: 100, height: 800, stage: this }),
-        new Wall({ x: -800, y: 1300, width: 400, height: 200, stage: this }),
-        new Wall({ x: 300, y: 1300, width: 800, height: 200, stage: this }),
-        new Wall({ x: -1250, y: 1300, width: 200, height: 50, stage: this })
-      )
+  circle ({ color = 'white', radius, x, y }: {
+    color?: string
+    radius: number
+    x: number
+    y: number
+  }): void {
+    const circle = new Circle({ color, radius, x, y })
+    this.circles.push(circle)
+  }
+
+  collide ({ delta, pair }: {
+    delta?: number
+    pair: Matter.IPair
+  }): void {
+    const actorA = this.actors.get(pair.bodyA.id)
+    const actorB = this.actors.get(pair.bodyB.id)
+    // @ts-expect-error
+    const { normal } = pair.collision
+    actorA?.collide({ actor: actorB, body: pair.bodyB, delta, normal })
+    actorB?.collide({ actor: actorA, body: pair.bodyA, delta, normal })
+  }
+
+  control ({ controls, id }: {
+    controls: Controls
+    id: string
+  }): void {
+    const player = Player.players.get(id)
+    if (player == null) {
+      throw new Error('Player not found')
     }
-    if (wallBots) {
-      this.walls.forEach(wall => wall.spawnBots())
+    player.controls = controls
+    if (player.controls.select) {
+      this.paused = false
+      this.runner.enabled = !this.paused
     }
-    const innerSize = size - Character.MARGIN * 2
+  }
+
+  debug ({ label }: { label?: string | number }): void {
+    console.debug('CLIENT DEBUG:', label)
+    console.debug(label, 'bots length:', this.bots.length)
+  }
+
+  getAllIts (): Character[] {
+    const its: Character[] = []
+    const characters = this.characters.values()
+    for (const character of characters) {
+      const it = character.isIt()
+      if (it) its.push(character)
+    }
+    return its
+  }
+
+  getFirstIt (): Character | undefined {
+    const characters = this.characters.values()
+    for (const character of characters) {
+      if (character.isIt()) return character
+    }
+  }
+
+  getSafestWaypoint (props?: {
+    its?: boolean
+  }): Waypoint {
+    const characters = props?.its === true ? this.getAllIts() : [...this.characters.values()]
+    const waypoints = this.waypointGroups[15]
+    const farthest = waypoints.reduce<{ waypoint?: Waypoint, distance: number }>((farthest, waypoint) => {
+      const distance = characters.reduce((distance, it) => {
+        const d = Matter.Vector.magnitude(Matter.Vector.sub(it.feature.body.position, waypoint.position))
+        return d < distance ? d : distance
+      }, Infinity)
+      return distance > farthest.distance ? { waypoint, distance } : farthest
+    }, { distance: 0 })
+    if (farthest.waypoint == null) {
+      throw new Error('No farthest waypoint')
+    }
+    return farthest.waypoint
+  }
+
+  getSpawnLimit (): number {
+    return this.characters.size * 500
+  }
+
+  join (id: string): Player {
+    const firstIt = this.getFirstIt()
+    if (firstIt == null) {
+      return new Player({
+        id,
+        observer: this.observer,
+        x: 0,
+        y: 0,
+        stage: this,
+        blue: Character.IT_COLOR.blue,
+        green: Character.IT_COLOR.green,
+        red: Character.IT_COLOR.red
+      })
+    }
+    const position = firstIt?.getExploreHeading({})?.waypoint.position ?? { x: 0, y: 0 }
+    return new Player({
+      id,
+      observer: this.observer,
+      x: position.x,
+      y: position.y,
+      stage: this
+    })
+  }
+
+  leave (id: string): void {
+    const player = Player.players.get(id)
+    if (player == null) return
+    if (player?.isIt()) {
+      const its = this.getAllIts()
+      if (its.length === 1) {
+        const notItBots = this.bots.filter(bot => !bot.isIt())
+        notItBots[0]?.makeIt({ oldIt: player })
+      }
+    }
+    player?.destroy()
+  }
+
+  label ({ color = 'white', text, x, y }: {
+    color?: string
+    text: string
+    x: number
+    y: number
+  }): void {
+    const label = new Label({ color, text, x, y })
+    this.labels.push(label)
+  }
+
+  line ({ color = 'black', end, start }: {
+    color: string
+    end: Matter.Vector
+    start: Matter.Vector
+  }): void {
+    const line = new Line({ color, end, start })
+    this.lines.push(line)
+  }
+
+  randomBrick ({ x, y, width, height, minimumWidth = 1, minimumHeight = 1 }: {
+    x: number
+    y: number
+    width: number
+    height: number
+    minimumWidth?: number
+    minimumHeight?: number
+  }): Brick {
+    const rectangle = getRandomRectangleSize({
+      minimumWidth: minimumWidth, maximumWidth: width, minimumHeight: minimumHeight, maximumHeight: height
+    })
+
+    return new Brick({
+      x, y, width: rectangle.width, height: rectangle.height, stage: this
+    })
+  }
+
+  spawnSafestBrick (): void {
+    const waypoint = this.getSafestWaypoint()
+    this.randomBrick({
+      x: waypoint.position.x,
+      y: waypoint.position.y,
+      width: 30,
+      height: 30
+    })
+  }
+
+  start (): void {
+    this.block()
+    if (this.waypointBots || this.waypointBricks) {
+      const waypointArrays = Object.values(this.waypointGroups)
+      const waypoints = waypointArrays.reduce((waypoints, waypointArray) => [...waypoints, ...waypointArray], [])
+      if (this.waypointBots) {
+        waypoints.forEach(waypoint => {
+          void new Bot({ x: waypoint.x, y: waypoint.y, stage: this })
+        })
+      }
+      if (this.waypointBricks) {
+        waypoints.forEach(waypoint => {
+          this.randomBrick({ x: waypoint.x, y: waypoint.y, width: Bot.MAXIMUM_RADIUS * 2, height: Bot.MAXIMUM_RADIUS * 2 })
+        })
+      }
+    }
+    const marginEdge = this.halfSize - Character.MARGIN
+    if (this.cornerBots) {
+      void new Bot({ x: -marginEdge, y: -marginEdge, stage: this })
+      void new Bot({ x: marginEdge, y: -marginEdge, stage: this })
+      void new Bot({ x: -marginEdge, y: marginEdge, stage: this })
+      void new Bot({ x: marginEdge, y: marginEdge, stage: this })
+    }
+    if (this.midpointBots) {
+      void new Bot({ x: 0, y: -marginEdge, stage: this })
+      void new Bot({ x: marginEdge, y: 0, stage: this })
+      void new Bot({ x: 0, y: marginEdge, stage: this })
+      void new Bot({ x: -marginEdge, y: 0, stage: this })
+    }
+    const innerSize = this.size - Character.MARGIN * 2
     this.xFactor = 2
-    this.xSegment = innerSize / this.xFactor
-    while (this.xSegment > VISION_INNER.width) {
+    let xSegment = innerSize / this.xFactor
+    while (xSegment > VISION_INNER.width) {
       this.xFactor = this.xFactor + 1
-      this.xSegment = innerSize / this.xFactor
+      xSegment = innerSize / this.xFactor
     }
     this.yFactor = 2
-    this.ySegment = innerSize / this.yFactor
-    while (this.ySegment > VISION_INNER.height) {
+    let ySegment = innerSize / this.yFactor
+    while (ySegment > VISION_INNER.height) {
       this.yFactor = this.yFactor + 1
-      this.ySegment = innerSize / this.yFactor
+      ySegment = innerSize / this.yFactor
     }
     const gridPoints: Matter.Vector[] = []
     for (let i = 0; i <= this.xFactor; i++) {
       for (let j = 0; j <= this.yFactor; j++) {
-        const x = -innerSize / 2 + i * this.xSegment
-        const y = -innerSize / 2 + j * this.ySegment
+        const x = -innerSize / 2 + i * xSegment
+        const y = -innerSize / 2 + j * ySegment
         gridPoints.push({ x, y })
         this.radii.forEach(radius => {
           void new Waypoint({ stage: this, x, y, radius })
         })
       }
     }
+    if (this.gridBots) gridPoints.forEach(point => new Bot({ x: point.x, y: point.y, stage: this }))
     this.radii.forEach(radius => {
       console.info('Pathfinding for radius:', radius)
       const group = this.waypointGroups[radius]
@@ -319,109 +496,6 @@ export default class Stage {
       })
     })
     console.info('Pathfinding complete!')
-    if (wildBricks) {
-      void new Brick({ stage: this, x: -500, y: 0, width: 200, height: 500 })
-      this.randomBrick({ x: -30, y: -30, height: 30, width: 30 })
-      this.randomBrick({ x: -30, y: -30, height: 30, width: 30 })
-      this.randomBrick({ x: 30, y: -30, height: 30, width: 30 })
-      this.randomBrick({ x: 0, y: -30, height: 30, width: 30 })
-      this.randomBrick({ x: 0, y: -30, height: 30, width: 100 })
-      this.randomBrick({ x: 30, y: 0, height: 30, width: 50 })
-      this.randomBrick({ x: -30, y: 0, height: 50, width: 30 })
-      this.randomBrick({ x: -800, y: 0, height: 80, width: 30 })
-      this.randomBrick({ x: -900, y: 0, height: 50, width: 50 })
-      this.randomBrick({ x: -1000, y: 0, height: 50, width: 50 })
-      this.randomBrick({ x: -1100, y: 0, height: 90, width: 80 })
-      this.randomBrick({ x: -1200, y: 0, height: 50, width: 50 })
-      this.randomBrick({ x: -1300, y: 0, height: 50, width: 50 })
-      this.randomBrick({ x: -1400, y: 0, height: 50, width: 50 })
-      this.randomBrick({ x: 0, y: 30, height: 30, width: 30 })
-      this.randomBrick({ x: 30, y: 30, height: 30, width: 30 })
-      this.randomBrick({ x: -30, y: 30, height: 30, width: 30 })
-      this.randomBrick({ x: -500, y: 1400, height: 100, width: 200 })
-      this.randomBrick({ x: -1300, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 750, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 800, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 850, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 900, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 950, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1000, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1050, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1100, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1150, y: 1300, height: 100, width: 30 })
-      this.randomBrick({ x: 1200, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1250, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1300, y: 1300, height: 300, width: 30 })
-      this.randomBrick({ x: 1350, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1400, y: 1300, height: 200, width: 30 })
-      this.randomBrick({ x: 1450, y: 1300, height: 200, width: 30 })
-    }
-    if (wildPuppets) {
-      const vertices = [
-        { x: 100.75, y: 253.97279832749837 },
-        { x: 100.75, y: -153.97279832749837 },
-        { x: -100.75, y: 0 }
-      ]
-      void new Puppet({
-        x: -1200,
-        y: -1200,
-        direction: SOUTH_VECTOR,
-        stage: this,
-        vertices
-      })
-      void new Puppet({
-        x: 1350,
-        y: -200,
-        direction: NORTH_VECTOR,
-        force: 0.0001,
-        stage: this
-      })
-      void new Puppet({
-        x: 1000,
-        y: 0,
-        force: 0.008,
-        direction: WEST_VECTOR,
-        stage: this
-      })
-      void new Puppet({
-        x: -1700,
-        y: 1700,
-        direction: EAST_VECTOR,
-        stage: this,
-        vertices
-      })
-    }
-    if (centerBot) void new Bot({ x: 100, y: 0, stage: this })
-    if (greekBots) greekWalls.forEach(wall => wall.spawnBots())
-    if (townBots) townWalls.forEach(wall => wall.spawnBots())
-    if (gridBots) gridPoints.forEach(point => new Bot({ x: point.x, y: point.y, stage: this }))
-    if (countryBots) countryWalls.forEach(wall => wall.spawnBots())
-    if (waypointBots || waypointBricks) {
-      const waypointArrays = Object.values(this.waypointGroups)
-      const waypoints = waypointArrays.reduce((waypoints, waypointArray) => [...waypoints, ...waypointArray], [])
-      if (waypointBots) {
-        waypoints.forEach(waypoint => {
-          void new Bot({ x: waypoint.x, y: waypoint.y, stage: this })
-        })
-      }
-      if (waypointBricks) {
-        waypoints.forEach(waypoint => {
-          this.randomBrick({ x: waypoint.x, y: waypoint.y, width: Bot.MAXIMUM_RADIUS * 2, height: Bot.MAXIMUM_RADIUS * 2 })
-        })
-      }
-    }
-    if (cornerBots) {
-      void new Bot({ x: -marginEdge, y: -marginEdge, stage: this })
-      void new Bot({ x: marginEdge, y: -marginEdge, stage: this })
-      void new Bot({ x: -marginEdge, y: marginEdge, stage: this })
-      void new Bot({ x: marginEdge, y: marginEdge, stage: this })
-    }
-    if (midpointBots) {
-      void new Bot({ x: 0, y: -marginEdge, stage: this })
-      void new Bot({ x: marginEdge, y: 0, stage: this })
-      void new Bot({ x: 0, y: marginEdge, stage: this })
-      void new Bot({ x: -marginEdge, y: 0, stage: this })
-    }
     Matter.Runner.run(this.runner, this.engine)
     const { append } = csvAppend('steps.csv')
     Matter.Events.on(this.engine, 'afterUpdate', () => {
@@ -541,171 +615,6 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         const delta = this.engine.timing.lastDelta
         this.collide({ delta, pair })
       })
-    })
-  }
-
-  circle ({ color = 'white', radius, x, y }: {
-    color?: string
-    radius: number
-    x: number
-    y: number
-  }): void {
-    const circle = new Circle({ color, radius, x, y })
-    this.circles.push(circle)
-  }
-
-  collide ({ delta, pair }: {
-    delta?: number
-    pair: Matter.IPair
-  }): void {
-    const actorA = this.actors.get(pair.bodyA.id)
-    const actorB = this.actors.get(pair.bodyB.id)
-    // @ts-expect-error
-    const { normal } = pair.collision
-    actorA?.collide({ actor: actorB, body: pair.bodyB, delta, normal })
-    actorB?.collide({ actor: actorA, body: pair.bodyA, delta, normal })
-  }
-
-  control ({ controls, id }: {
-    controls: Controls
-    id: string
-  }): void {
-    const player = Player.players.get(id)
-    if (player == null) {
-      throw new Error('Player not found')
-    }
-    player.controls = controls
-    if (player.controls.select) {
-      this.paused = false
-      this.runner.enabled = !this.paused
-    }
-  }
-
-  debug ({ label }: { label?: string | number }): void {
-    console.debug('CLIENT DEBUG:', label)
-    console.debug(label, 'bots length:', this.bots.length)
-  }
-
-  getAllIts (): Character[] {
-    const its: Character[] = []
-    const characters = this.characters.values()
-    for (const character of characters) {
-      const it = character.isIt()
-      if (it) its.push(character)
-    }
-    return its
-  }
-
-  getFirstIt (): Character | undefined {
-    const characters = this.characters.values()
-    for (const character of characters) {
-      if (character.isIt()) return character
-    }
-  }
-
-  getSafestWaypoint (props?: {
-    its?: boolean
-  }): Waypoint {
-    const characters = props?.its === true ? this.getAllIts() : [...this.characters.values()]
-    const waypoints = this.waypointGroups[15]
-    const farthest = waypoints.reduce<{ waypoint?: Waypoint, distance: number }>((farthest, waypoint) => {
-      const distance = characters.reduce((distance, it) => {
-        const d = Matter.Vector.magnitude(Matter.Vector.sub(it.feature.body.position, waypoint.position))
-        return d < distance ? d : distance
-      }, Infinity)
-      return distance > farthest.distance ? { waypoint, distance } : farthest
-    }, { distance: 0 })
-    if (farthest.waypoint == null) {
-      throw new Error('No farthest waypoint')
-    }
-    return farthest.waypoint
-  }
-
-  getSpawnLimit (): number {
-    return this.characters.size * 500
-  }
-
-  join (id: string): Player {
-    const firstIt = this.getFirstIt()
-    console.log('firstIt', firstIt)
-    if (firstIt == null) {
-      return new Player({
-        id,
-        observer: this.observer,
-        x: 0,
-        y: 0,
-        stage: this,
-        blue: Character.IT_COLOR.blue,
-        green: Character.IT_COLOR.green,
-        red: Character.IT_COLOR.red
-      })
-    }
-    const position = firstIt?.getExploreHeading({})?.waypoint.position ?? { x: 0, y: 0 }
-    return new Player({
-      id,
-      observer: this.observer,
-      x: position.x,
-      y: position.y,
-      stage: this
-    })
-  }
-
-  leave (id: string): void {
-    const player = Player.players.get(id)
-    if (player == null) return
-    if (player?.isIt()) {
-      const its = this.getAllIts()
-      if (its.length === 1) {
-        const notItBots = this.bots.filter(bot => !bot.isIt())
-        notItBots[0]?.makeIt({ oldIt: player })
-      }
-    }
-    player?.destroy()
-  }
-
-  label ({ color = 'white', text, x, y }: {
-    color?: string
-    text: string
-    x: number
-    y: number
-  }): void {
-    const label = new Label({ color, text, x, y })
-    this.labels.push(label)
-  }
-
-  line ({ color = 'black', end, start }: {
-    color: string
-    end: Matter.Vector
-    start: Matter.Vector
-  }): void {
-    const line = new Line({ color, end, start })
-    this.lines.push(line)
-  }
-
-  randomBrick ({ x, y, width, height, minimumWidth = 1, minimumHeight = 1 }: {
-    x: number
-    y: number
-    width: number
-    height: number
-    minimumWidth?: number
-    minimumHeight?: number
-  }): Brick {
-    const rectangle = getRandomRectangleSize({
-      minimumWidth: minimumWidth, maximumWidth: width, minimumHeight: minimumHeight, maximumHeight: height
-    })
-
-    return new Brick({
-      x, y, width: rectangle.width, height: rectangle.height, stage: this
-    })
-  }
-
-  spawnSafestBrick (): void {
-    const waypoint = this.getSafestWaypoint()
-    this.randomBrick({
-      x: waypoint.position.x,
-      y: waypoint.position.y,
-      width: 30,
-      height: 30
     })
   }
 

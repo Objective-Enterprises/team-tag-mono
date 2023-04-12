@@ -98,6 +98,27 @@ export default class Wall extends RectangleFeature {
     }
   }
 
+  isIntersected ({ height, width, x, y }: {
+    height: number
+    width: number
+    x: number
+    y: number
+  }): boolean {
+    const leftSide = x - (width / 2)
+    const rightSide = x + (width / 2)
+    const toRight = leftSide >= this.rightSide
+    const toLeft = rightSide <= this.leftSide
+    const noHorizontal = toRight || toLeft
+    if (noHorizontal) return false
+    const topSide = y - (height / 2)
+    const bottomSide = y + (height / 2)
+    const toBottom = topSide >= this.bottomSide
+    const toTop = bottomSide <= this.topSide
+    const noVertical = toBottom || toTop
+    if (noVertical) return false
+    return true
+  }
+
   spawnBots (): void {
     const leftMargin = this.leftSide - Character.MARGIN
     const rightMargin = this.rightSide + Character.MARGIN

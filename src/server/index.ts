@@ -5,11 +5,9 @@ import https from 'https'
 import fs from 'fs'
 import socketIo from 'socket.io'
 import { ClientToServerEvents, ServerToClientEvents } from '../shared/socket'
-import Stage from './Stage'
-const stage = new Stage({
-  spawnOnScore: false
-  // town: false, country: false, greek: false, centerBot: true, spawnOnTimer: true, spawnOnDestroy: true, spawnOnScore: false, spawnOnTag: true, wildBricks: true, wildPuppets: false, debugFeatures: true, debugPlayerVision: true
-})
+import Procedural from './Procedural'
+const stage = new Procedural()
+stage.start()
 const app = express()
 const staticPath = path.join(__dirname, '..', '..', 'dist')
 const staticMiddleware = express.static(staticPath)
