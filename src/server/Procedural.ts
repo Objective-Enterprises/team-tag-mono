@@ -1,9 +1,13 @@
 import Stage from './Stage'
 import Wall from './Wall'
 import Character from './Character'
+import { MarginedRectangle } from './types'
+import Brick from './Brick'
 
 export default class Procedural extends Stage {
+  static FILL = 0.25
   proceduralWalls: Wall[] = []
+  proceduralBricks: Brick[] = []
   doubleMargin: number
   fails = 0
   margin: number
@@ -30,7 +34,7 @@ export default class Procedural extends Stage {
       if (this.fails % 10000 === 0) {
         console.info(this.fails, 'consecutive procedural failures', this.getFill())
       }
-      this.tryWall()
+      this.guardWall()
     }
     console.info('Final procedural fill:', this.getFill())
     super.block()
@@ -53,8 +57,31 @@ export default class Procedural extends Stage {
     return factor + this.minimumSize
   }
 
+  getRectangle (): MarginedRectangle {
+    const x = this.getRandomCoordinate()
+    const y = this.getRandomCoordinate()
+    const width = this.getRandomSize()
+    const height = this.getRandomSize()
+    const marginedWidth = width + this.doubleMargin
+    const marginWidth = height + this.doubleMargin
+    const margined = {
+      height: marginWidth,
+      width: marginedWidth,
+      x,
+      y
+    }
+    const rectangle = {
+      height,
+      margined,
+      width,
+      x,
+      y
+    }
+    return rectangle
+  }
+
   isStuck (): boolean {
-    const full = this.getFill() > 0.5
+    const full = this.getFill() > Procedural.FILL
     if (full) {
       console.log('Procedural fill is full')
       return true
@@ -71,26 +98,34 @@ export default class Procedural extends Stage {
     return false
   }
 
-  tryWall (): void {
-    const x = this.getRandomCoordinate()
-    const y = this.getRandomCoordinate()
-    const width = this.getRandomSize()
-    const height = this.getRandomSize()
-    const intersectionWidth = width + this.doubleMargin
-    const intersectionHeight = height + this.doubleMargin
-    const intersectionProps = { x, y, width: intersectionWidth, height: intersectionHeight }
-    const intersectingProceduralWall = this.proceduralWalls.find(wall => wall.isIntersected(intersectionProps))
+  guardRectangle (): MarginedRectangle | undefined {
+    const rectangle = this.getRectangle()
+    const intersectingProceduralWall = this.proceduralWalls.find(wall => wall.isIntersected(rectangle.margined))
     if (intersectingProceduralWall != null) {
       this.fails += 1
       return
     }
-    const intersectingWall = this.walls.find(wall => wall.isIntersected(intersectionProps))
+    const intersectingWall = this.walls.find(wall => wall.isIntersected(rectangle.margined))
     if (intersectingWall != null) {
       this.fails += 1
       return
     }
     this.fails = 0
-    const wall = new Wall({ height, stage: this, width, x, y })
+    return rectangle
+  }
+
+  guardWall (): void {
+    const rectangle = this.guardRectangle()
+    if (rectangle == null) {
+      return
+    }
+    const wall = new Wall({
+      height: rectangle.height,
+      stage: this,
+      width: rectangle.width,
+      x: rectangle.x,
+      y: rectangle.y
+    })
     this.proceduralWalls.push(wall)
     console.info(this.proceduralWalls.length, 'producedural walls...')
   }
