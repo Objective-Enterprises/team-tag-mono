@@ -15,7 +15,7 @@ export default class Player extends Character {
     green = Character.NOT_IT_COLOR.green,
     id,
     observer = false,
-    radius = 15,
+    radius = Character.DEFAULT_RADIUS,
     red = Character.NOT_IT_COLOR.red,
     stage,
     x = 0,
@@ -65,7 +65,7 @@ export default class Player extends Character {
           }
         })
         const scores = this.goals.filter(goal => goal.scored)
-        const waypointsLength = this.stage.waypointGroups[15].length
+        const waypointsLength = this.stage.waypointGroups[Character.DEFAULT_RADIUS].length
         if (scores.length > waypointsLength) {
           throw new Error('More scores than waypoints')
         }
@@ -102,16 +102,22 @@ export default class Player extends Character {
   }
 
   setGoal (): void {
-    const heading = this.getExploreHeading({ debug: false, goals: this.goals })
+    const heading = this.getExploreHeading({
+      debug: false,
+      goals: this.goals,
+      group: Character.DEFAULT_RADIUS
+    })
     if (heading == null) {
-      throw new Error('Can not set goal')
+      // throw new Error('Can not set goal')
+      console.warn('!!! Can not set goal !!!')
+      this.stage.paused = true
+      return
     }
     const closeGoal = this.goals.find(goal => {
-      const xDifference = Math.abs(goal.heading.waypoint.position.x - heading.waypoint.position.x)
-      const yDifference = Math.abs(goal.heading.waypoint.position.y - heading.waypoint.position.y)
-      const xClose = xDifference < 5
-      const yClose = yDifference < 5
-      return xClose && yClose
+      const xEqual = goal.heading.waypoint.position.x === heading.waypoint.position.x
+      if (!xEqual) return false
+      const yEqual = goal.heading.waypoint.position.y === heading.waypoint.position.y
+      return yEqual
     })
     if (closeGoal == null) {
       const newGoal = { heading, passed: false, scored: false, number: 0 }

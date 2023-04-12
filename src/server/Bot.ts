@@ -20,7 +20,15 @@ export default class Bot extends Character {
   pathTime?: number
   pathLabel?: typeof Bot.pathLabels[number]
   unblockTries?: Record<number, boolean>
-  constructor ({ blue, green, radius = 15, red, stage, x = 0, y = 0 }: {
+  constructor ({
+    blue,
+    green,
+    radius = Character.DEFAULT_RADIUS,
+    red,
+    stage,
+    x = 0,
+    y = 0
+  }: {
     alpha?: number
     blue?: number
     green?: number
@@ -222,7 +230,7 @@ export default class Bot extends Character {
       }
       return true
     }
-    const arriving = !confused && this.isPointClose({ point: this.path[0], limit: 15 })
+    const arriving = !confused && this.isPointClose({ point: this.path[0], limit: this.feature.getRadius() })
     if (arriving) {
       if (this.stage.debugBored) {
         this.stage.circle({ color: 'magenta', radius: 10, x: this.feature.body.position.x, y: this.feature.body.position.y })

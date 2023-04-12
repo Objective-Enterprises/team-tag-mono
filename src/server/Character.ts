@@ -14,6 +14,8 @@ import Stage from './Stage'
 import { Goal, Heading } from './types'
 
 export default class Character extends Actor {
+  static DEFAULT_RADIUS = 15
+  static MINIMUM_RADIUS = 10
   static MAXIMUM_RADIUS = 15
   static MARGIN = Character.MAXIMUM_RADIUS + 1
   static IT_COLOR = { blue: 0, green: 0, red: 255 }
@@ -32,7 +34,7 @@ export default class Character extends Actor {
   constructor ({
     blue = Character.NOT_IT_COLOR.blue,
     green = Character.NOT_IT_COLOR.green,
-    radius = 15,
+    radius = Character.DEFAULT_RADIUS,
     red = Character.NOT_IT_COLOR.red,
     stage,
     x = 0,
@@ -133,9 +135,15 @@ export default class Character extends Actor {
     this.stage.characterBodies = this.stage.characterBodies.filter(body => body.id !== this.feature.body.id)
   }
 
-  exploreHeading ({ heading }: { heading: Heading }): Heading {
-    const group = this.getGroup()
-    this.headings[group][heading.waypoint.id].time = Date.now()
+  exploreHeading ({
+    heading,
+    group
+  }: {
+    heading: Heading
+    group?: number
+  }): Heading {
+    const headingGroup = group == null ? this.getGroup() : group
+    this.headings[headingGroup][heading.waypoint.id].time = Date.now()
     heading.explored = true
     return heading
   }
@@ -144,9 +152,13 @@ export default class Character extends Actor {
     return getDistance(this.feature.body.position, point)
   }
 
-  getExploreHeading ({ debug, goals }: { debug?: boolean, goals?: Goal[] }): Heading | null {
-    const group = this.getGroup()
-    const headings = this.headings[group]
+  getExploreHeading ({ debug, goals, group }: {
+    debug?: boolean
+    goals?: Goal[]
+    group?: number
+  }): Heading | null {
+    const headingGroup = group == null ? this.getGroup() : group
+    const headings = this.headings[headingGroup]
     const inRangeHeadings = headings.filter(heading => this.isPointInRange(heading.waypoint.position))
     const wallClearHeadings = inRangeHeadings.filter(heading => {
       return this.stage.raycast.isPointClear({
@@ -242,7 +254,7 @@ export default class Character extends Actor {
       if (wallClearHeadings.length === 0) {
         return null
       }
-      return this.getEarlyFarHeading({ headings: wallClearHeadings, tight: true })
+      return this.getEarlyFarHeading({ headings: wallClearHeadings, tight: true, group: headingGroup })
     } else {
       if (goals != null) {
         const clearGoals = goals.filter(goal => characterClearHeadings.find(heading => heading.waypoint.id === goal.heading.waypoint.id))
@@ -251,11 +263,11 @@ export default class Character extends Actor {
           if (unscoredGoals.length === 1) {
             const goal = unscoredGoals[0]
             goal.heading.tight = true
-            return this.exploreHeading({ heading: goal.heading })
+            return this.exploreHeading({ heading: goal.heading, group })
           }
         }
       }
-      return this.getEarlyFarHeading({ headings: characterClearHeadings })
+      return this.getEarlyFarHeading({ headings: characterClearHeadings, group: headingGroup })
     }
   }
 
@@ -266,12 +278,16 @@ export default class Character extends Actor {
     return capped
   }
 
-  getEarlyFarHeading ({ headings, tight }: { headings: Heading[], tight?: boolean }): Heading {
+  getEarlyFarHeading ({ headings, tight, group }: {
+    headings: Heading[]
+    tight?: boolean
+    group?: number
+  }): Heading {
     const unexploredHeadings = headings.filter(heading => !heading.explored)
     if (unexploredHeadings.length === 1) {
       const unexploredHeading = unexploredHeadings[0]
       unexploredHeading.tight = true
-      return this.exploreHeading({ heading: unexploredHeading })
+      return this.exploreHeading({ heading: unexploredHeading, group })
     }
     const earlyHeading = headings.reduce((headingA, headingB) => {
       if (headingA.time < headingB.time) return headingA
@@ -289,7 +305,7 @@ export default class Character extends Actor {
     if (tight === true) {
       farHeading.tight = true
     }
-    return this.exploreHeading({ heading: farHeading })
+    return this.exploreHeading({ heading: farHeading, group })
   }
 
   getInRangeFeatures (): Feature[] {
@@ -792,7 +808,7 @@ export default class Character extends Actor {
     const spawnLimit = this.stage.getSpawnLimit()
     this.stage.spawnTime = this.stage.spawnTime + spawnLimit
     const radius = this.feature.getRadius()
-    const needed = 15 / radius
+    const needed = Character.DEFAULT_RADIUS / radius
     Matter.Body.scale(this.feature.body, needed, needed)
     oldIt?.loseIt({ newIt: this })
     // const propActor = oldIt?.loseIt({ newIt: this })

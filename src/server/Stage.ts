@@ -61,9 +61,7 @@ export default class Stage {
   lines: Line[] = []
   lostPoints: Matter.Vector[] = []
   maximumArea: number
-  maximumRadius = 15
   midpointBots: boolean
-  minimumRadius = 10
   observer: boolean
   oldest?: Bot
   oldTime = Date.now()
@@ -233,7 +231,7 @@ export default class Stage {
     this.spawnTime = Date.now()
     this.engine.gravity = { x: 0, y: 0, scale: 1 }
     this.raycast = new Raycast({ stage: this })
-    for (let radius = this.minimumRadius; radius <= this.maximumRadius; radius++) {
+    for (let radius = Character.MINIMUM_RADIUS; radius <= Character.MAXIMUM_RADIUS; radius++) {
       this.radii.push(radius)
     }
     this.radii.forEach(radius => { this.waypointGroups[radius] = [] })
@@ -316,7 +314,7 @@ export default class Stage {
     its?: boolean
   }): Waypoint {
     const characters = props?.its === true ? this.getAllIts() : [...this.characters.values()]
-    const waypoints = this.waypointGroups[15]
+    const waypoints = this.waypointGroups[Character.DEFAULT_RADIUS]
     const farthest = waypoints.reduce<{ waypoint?: Waypoint, distance: number }>((farthest, waypoint) => {
       const distance = characters.reduce((distance, it) => {
         const d = Matter.Vector.magnitude(Matter.Vector.sub(it.feature.body.position, waypoint.position))
@@ -550,7 +548,7 @@ ${stepCollisions} collisions (μ${averageCollisions}), ${bodies.length} bodies (
         this.lines = []
         this.circles = []
         if (this.debugWaypointCircles) {
-          this.waypointGroups[15].forEach(waypoint => {
+          this.waypointGroups[Character.DEFAULT_RADIUS].forEach(waypoint => {
             this.circle({
               color: 'darkblue',
               radius: 5,
