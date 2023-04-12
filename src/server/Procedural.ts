@@ -26,13 +26,13 @@ export default class Procedural extends Stage {
   }
 
   block (): void {
-    console.log('block', this.getFill())
-    while (this.getFill() < 0.5) {
-      console.log('start fill', this.getFill())
-      console.log('fails', this.fails)
+    while (!this.isStuck()) {
+      if (this.fails % 10000 === 0) {
+        console.info(this.fails, 'consecutive procedural failures', this.getFill())
+      }
       this.tryWall()
-      console.log('end fill', this.getFill())
     }
+    console.info('Final procedural fill:', this.getFill())
     super.block()
   }
 
@@ -53,6 +53,24 @@ export default class Procedural extends Stage {
     return factor + this.minimumSize
   }
 
+  isStuck (): boolean {
+    const full = this.getFill() > 0.5
+    if (full) {
+      console.log('Procedural fill is full')
+      return true
+    }
+
+    if (this.proceduralWalls.length >= 100) {
+      console.log('Too many procedural walls')
+      return true
+    }
+    if (this.fails > 1000000) {
+      console.warn('Too many procedural failures')
+      return true
+    }
+    return false
+  }
+
   tryWall (): void {
     const x = this.getRandomCoordinate()
     const y = this.getRandomCoordinate()
@@ -64,22 +82,16 @@ export default class Procedural extends Stage {
     const intersectingProceduralWall = this.proceduralWalls.find(wall => wall.isIntersected(intersectionProps))
     if (intersectingProceduralWall != null) {
       this.fails += 1
-      console.log('procedural intersection', intersectingProceduralWall.body.position)
       return
     }
     const intersectingWall = this.walls.find(wall => wall.isIntersected(intersectionProps))
     if (intersectingWall != null) {
       this.fails += 1
-      console.log('intersection', intersectingWall.body.position)
       return
     }
     this.fails = 0
-    console.log('no intersection')
-    console.log('x', x)
-    console.log('y', y)
-    console.log('width', width)
-    console.log('height', height)
     const wall = new Wall({ height, stage: this, width, x, y })
     this.proceduralWalls.push(wall)
+    console.info(this.proceduralWalls.length, 'producedural walls...')
   }
 }
