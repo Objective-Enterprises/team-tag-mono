@@ -100,6 +100,15 @@ export default class Feature {
     }
   }
 
+  isIntersected ({ height, width, x, y }: {
+    height: number
+    width: number
+    x: number
+    y: number
+  }): boolean {
+    throw new Error('Not implemented')
+  }
+
   getRadius (): number {
     throw new Error('Only circles have a radius')
   }

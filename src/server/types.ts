@@ -13,3 +13,22 @@ export interface Heading {
   tight: boolean
   explored: boolean
 }
+export interface Rectangle {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+export interface MarginedRectangle extends Rectangle {
+  margined: Rectangle
+}
+export interface PseudoActor {
+  feature: {
+    isIntersected: ({ height, width, x, y }: {
+      height: number
+      width: number
+      x: number
+      y: number
+    }) => boolean
+  }
+}

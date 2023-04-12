@@ -7,14 +7,9 @@ import Stage from './Stage'
 import Waypoint from './Waypoint'
 
 export default class Wall extends RectangleFeature {
+  readonly feature: RectangleFeature
   readonly x: number
   readonly y: number
-  readonly halfWidth: number
-  readonly halfHeight: number
-  readonly leftSide: number
-  readonly rightSide: number
-  readonly topSide: number
-  readonly bottomSide: number
   constructor ({
     blue = 255, green = 0, height = 100, red = 0, stage, waypoints = true, width = 100, x = 0, y = 0
   }: {
@@ -30,14 +25,9 @@ export default class Wall extends RectangleFeature {
   }) {
     super({ blue, green, height, red, stage, width, x, y })
     this.body.label = 'wall'
+    this.feature = this
     this.x = x
     this.y = y
-    this.halfWidth = this.width / 2
-    this.halfHeight = this.height / 2
-    this.leftSide = this.x - this.halfWidth
-    this.rightSide = this.x + this.halfWidth
-    this.topSide = this.y - this.halfHeight
-    this.bottomSide = this.y + this.halfHeight
     Matter.Body.setStatic(this.body, true)
     this.stage.walls.push(this)
     this.stage.wallBodies.push(this.body)
@@ -96,27 +86,6 @@ export default class Wall extends RectangleFeature {
         }
       })
     }
-  }
-
-  isIntersected ({ height, width, x, y }: {
-    height: number
-    width: number
-    x: number
-    y: number
-  }): boolean {
-    const leftSide = x - (width / 2)
-    const rightSide = x + (width / 2)
-    const toRight = leftSide >= this.rightSide
-    const toLeft = rightSide <= this.leftSide
-    const noHorizontal = toRight || toLeft
-    if (noHorizontal) return false
-    const topSide = y - (height / 2)
-    const bottomSide = y + (height / 2)
-    const toBottom = topSide >= this.bottomSide
-    const toTop = bottomSide <= this.topSide
-    const noVertical = toBottom || toTop
-    if (noVertical) return false
-    return true
   }
 
   spawnBots (): void {
